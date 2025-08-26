@@ -1,0 +1,48 @@
+{
+    "name": "locked-in",
+    "version": "2.0.0",
+    "description": "A focus app that blocks distracting applications and helps you stay productive",
+    "main": "src/main.js",
+    "scripts": {
+        "start": "electron .",
+        "build": "electron-builder",
+        "build-win": "electron-builder --win",
+        "dist": "electron-builder --publish=never"
+    },
+    "keywords": [
+        "productivity",
+        "focus",
+        "block-apps",
+        "time-management"
+    ],
+    "author": "Locked In Team",
+    "license": "MIT",
+    "devDependencies": {
+        "electron": "^27.0.0",
+        "electron-builder": "^24.6.4"
+    },
+    "build": {
+        "appId": "com.lockedin.app",
+        "productName": "Locked In",
+        "directories": {
+            "output": "dist"
+        },
+        "files": [
+            "src/**/*",
+            "assets/**/*",
+            "build/**/*",
+            "node_modules/**/*"
+        ],
+        "win": {
+            "target": "nsis",
+            "icon": "build/icon.ico"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "Locked In"
+        }
+    }
+}

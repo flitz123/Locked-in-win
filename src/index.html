@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Locked In - Focus & App Blocker</title>
+  <link rel="stylesheet" href="assets/css/main.css">
+  <link id="theme-style" rel="stylesheet" href="assets/css/themes/dark.css">
+</head>
+<body>
+  <div class="background-overlay"></div>
+  
+  <div class="center-container">
+    <div class="app-card">
+      <div class="app-header">
+        <img src="../build/icon.png" alt="Locked In Logo" class="app-logo">
+        <h1>Locked In</h1>
+        <p class="app-tagline">Block distractions. Stay focused.</p>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="focus">Focus Session</button>
+        <button class="tab-btn" data-tab="block">Block Apps</button>
+      </div>
+
+      <div class="tab-content">
+        <!-- Focus Tab -->
+        <div id="focus-tab" class="tab-pane active">
+          <div class="help-dropdown">
+            <button class="help-btn">How to Use ▾</button>
+            <div class="dropdown-content">
+              <h3>Getting Started</h3>
+              <ol>
+                <li><strong>Add Applications</strong>: Select programs you want to allow during focus sessions</li>
+                <li><strong>Block Applications</strong>: Add distracting apps to your block list</li>
+                <li><strong>Set Duration</strong>: Choose your focus period</li>
+                <li><strong>Start Session</strong>: Click to begin monitoring and blocking</li>
+              </ol>
+              
+              <div class="theme-switcher">
+                <span>Dark Mode</span>
+                <label class="switch" for="theme-toggle" title="Toggle dark/light mode">
+                  <input type="checkbox" id="theme-toggle" title="Toggle dark/light mode">
+                  <span class="slider round"></span>
+                </label>
+                <span>Light Mode</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="session-controls">
+            <div class="setting-group">
+              <label for="duration-input">Duration (minutes):</label>
+              <input type="number" id="duration-input" min="5" max="240" value="25">
+            </div>
+            
+            <div class="setting-group">
+              <h3>Allowed Applications</h3>
+              <div id="app-list" class="app-list"></div>
+              <button id="add-app-btn" class="secondary-btn">+ Add Application</button>
+            </div>
+            
+            <button id="start-btn" class="primary-btn">Start Focus Session</button>
+            <button id="stop-btn" class="secondary-btn" style="display: none;">Stop Session</button>
+          </div>
+        </div>
+
+        <!-- Block Tab -->
+        <div id="block-tab" class="tab-pane">
+          <div class="setting-group">
+            <h3>Blocked Applications</h3>
+            <p>These apps will be automatically closed during focus sessions</p>
+            <div id="block-list" class="app-list"></div>
+            <button id="add-block-btn" class="secondary-btn">+ Add to Block List</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
