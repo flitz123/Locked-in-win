@@ -46,8 +46,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('start-btn').addEventListener('click', startSession);
   document.getElementById('stop-btn').addEventListener('click', stopSession);
   
+  // Add default applications if none exist
+  if (userSelectedApps.length === 0) {
+    addDefaultApplications();
+  }
+  
   console.log('App initialized successfully');
 });
+
+function addDefaultApplications() {
+  const defaultApps = ['notepad', 'calculator', 'msedge', 'chrome', 'firefox'];
+  const askForDefaults = confirm('Would you like to add some default allowed applications (Notepad, Calculator, Web Browsers)?');
+  
+  if (askForDefaults) {
+    userSelectedApps = [...defaultApps];
+    localStorage.setItem('selectedApps', JSON.stringify(userSelectedApps));
+    renderAppList();
+  }
+}
 
 async function loadBlockedApps() {
   try {
@@ -73,11 +89,16 @@ async function showAppSelectionDialog(type) {
           <button class="close-modal">&times;</button>
         </div>
         <div style="margin: 10px 0;">
-          <button id="browse-apps" class="secondary-btn">Browse Files...</button>
-          <button id="detect-apps" class="secondary-btn">Detect Installed Apps</button>
+          <button id="browse-apps" class="secondary-btn">📁 Browse Files...</button>
+          <button id="detect-apps" class="secondary-btn">🔍 Detect Installed Apps</button>
+          <button id="add-manual" class="secondary-btn">✏️ Add Manually</button>
         </div>
-        <div id="app-selection-list" style="margin: 10px 0; max-height: 300px; overflow-y: auto;"></div>
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <div id="manual-input" style="display: none; margin: 10px 0;">
+          <input type="text" id="manual-app-name" placeholder="Enter application name (e.g., chrome, notepad)" style="width: 70%; padding: 8px;">
+          <button id="add-manual-btn" class="secondary-btn" style="width: 25%;">Add</button>
+        </div>
+        <div id="app-selection-list" style="margin: 10px 0; max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px;"></div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px;">
           <button id="cancel-selection" class="secondary-btn">Cancel</button>
           <button id="confirm-selection" class="primary-btn">Add Selected</button>
         </div>
@@ -89,28 +110,26 @@ async function showAppSelectionDialog(type) {
     // Event handlers
     document.getElementById('detect-apps').addEventListener('click', () => loadDetectedApps(type));
     document.getElementById('browse-apps').addEventListener('click', () => browseForApp(type));
+    document.getElementById('add-manual').addEventListener('click', () => {
+      const manualInput = document.getElementById('manual-input');
+      manualInput.style.display = manualInput.style.display === 'none' ? 'block' : 'none';
+    });
+    
+    document.getElementById('add-manual-btn').addEventListener('click', () => {
+      const appName = document.getElementById('manual-app-name').value.trim();
+      if (appName) {
+        addSingleApp(appName, type);
+        document.getElementById('manual-app-name').value = '';
+      }
+    });
+    
     document.getElementById('cancel-selection').addEventListener('click', () => modal.remove());
+    
     document.getElementById('confirm-selection').addEventListener('click', () => {
       const selectedApps = Array.from(document.querySelectorAll('#app-selection-list input[type="checkbox"]:checked'))
         .map(checkbox => checkbox.value);
       
-      if (type === 'allowed') {
-        selectedApps.forEach(app => {
-          if (!userSelectedApps.includes(app)) {
-            userSelectedApps.push(app);
-          }
-        });
-        renderAppList();
-        localStorage.setItem('selectedApps', JSON.stringify(userSelectedApps));
-      } else {
-        selectedApps.forEach(app => {
-          if (window.electronAPI && window.electronAPI.addToBlockList) {
-            window.electronAPI.addToBlockList(app);
-          }
-        });
-        loadBlockedApps();
-      }
-      
+      selectedApps.forEach(app => addSingleApp(app, type));
       modal.remove();
     });
 
@@ -125,38 +144,71 @@ async function showAppSelectionDialog(type) {
   }
 }
 
+async function addSingleApp(appName, type) {
+  if (type === 'allowed') {
+    if (!userSelectedApps.includes(appName)) {
+      userSelectedApps.push(appName);
+      renderAppList();
+      localStorage.setItem('selectedApps', JSON.stringify(userSelectedApps));
+    }
+  } else {
+    if (window.electronAPI && window.electronAPI.addToBlockList) {
+      await window.electronAPI.addToBlockList(appName);
+      await loadBlockedApps();
+    }
+  }
+}
+
 async function loadDetectedApps(type) {
   try {
     const appList = document.getElementById('app-selection-list');
-    appList.innerHTML = '<p>Loading applications...</p>';
+    appList.innerHTML = '<div style="padding: 20px; text-align: center;"><p>🔍 Scanning for installed applications...</p></div>';
 
     if (window.electronAPI && window.electronAPI.getInstalledApps) {
       const apps = await window.electronAPI.getInstalledApps();
       
       if (apps.length === 0) {
-        appList.innerHTML = '<p>No applications detected. Try browsing manually.</p>';
+        appList.innerHTML = `
+          <div style="padding: 20px; text-align: center;">
+            <p>❌ No applications detected automatically.</p>
+            <p>Try browsing manually or adding applications by name.</p>
+          </div>
+        `;
         return;
       }
 
       const currentList = type === 'allowed' ? userSelectedApps : blockedApps;
       
-      appList.innerHTML = apps.map(app => `
-        <div class="app-selection-item">
-          <label>
+      appList.innerHTML = `
+        <div style="padding: 10px; background: var(--bg-color); border-bottom: 1px solid var(--border-color);">
+          <strong>Found ${apps.length} applications:</strong>
+        </div>
+        ${apps.map(app => `
+          <label class="app-selection-item">
             <input type="checkbox" value="${app.name}" 
                   ${currentList.includes(app.name) ? 'checked' : ''}>
-            <span>${app.displayName || app.name}</span>
+            <div>
+              <div><strong>${app.displayName || app.name}</strong></div>
+              <small style="color: var(--text-secondary);">${app.path}</small>
+            </div>
           </label>
-          <small>${app.path}</small>
-        </div>
-      `).join('');
+        `).join('')}
+      `;
     } else {
-      appList.innerHTML = '<p>API not available. Please try again.</p>';
+      appList.innerHTML = `
+        <div style="padding: 20px; text-align: center;">
+          <p>⚠️ API not available. Please try again.</p>
+        </div>
+      `;
     }
   } catch (err) {
     console.error('Failed to load detected apps:', err);
-    document.getElementById('app-selection-list').innerHTML = 
-      '<p>Error loading applications. Try browsing manually.</p>';
+    document.getElementById('app-selection-list').innerHTML = `
+      <div style="padding: 20px; text-align: center;">
+        <p>❌ Error loading applications.</p>
+        <p>Try browsing manually or adding by name.</p>
+      </div>
+    `;
   }
 }
 
@@ -165,18 +217,7 @@ async function browseForApp(type) {
     if (window.electronAPI && window.electronAPI.showAppPicker) {
       const result = await window.electronAPI.showAppPicker();
       if (result && result.app) {
-        if (type === 'allowed') {
-          if (!userSelectedApps.includes(result.app)) {
-            userSelectedApps.push(result.app);
-            renderAppList();
-            localStorage.setItem('selectedApps', JSON.stringify(userSelectedApps));
-          }
-        } else {
-          if (window.electronAPI && window.electronAPI.addToBlockList) {
-            await window.electronAPI.addToBlockList(result.app);
-            await loadBlockedApps();
-          }
-        }
+        await addSingleApp(result.app, type);
         document.querySelector('.modal')?.remove();
       }
     }
@@ -188,33 +229,47 @@ async function browseForApp(type) {
 
 function renderAppList() {
   const appList = document.getElementById('app-list');
+  if (userSelectedApps.length === 0) {
+    appList.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">No applications added yet. Click "Add Application" to get started.</div>';
+    return;
+  }
+  
   appList.innerHTML = userSelectedApps.map(app => `
     <div class="app-tag" data-app-name="${app}">
-      ${app}
-      <span class="remove-app" onclick="removeApp('${app}', 'allowed')">×</span>
+      <span>📱 ${app}</span>
+      <span class="remove-app" onclick="removeApp('${app}', 'allowed')" title="Remove ${app}">×</span>
     </div>
   `).join('');
 }
 
 function renderBlockList() {
   const blockList = document.getElementById('block-list');
+  if (blockedApps.length === 0) {
+    blockList.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">No applications blocked yet. Add apps that distract you during focus sessions.</div>';
+    return;
+  }
+  
   blockList.innerHTML = blockedApps.map(app => `
     <div class="app-tag blocked-app" data-app-name="${app}">
-      ${app}
-      <span class="remove-app" onclick="removeApp('${app}', 'blocked')">×</span>
+      <span>🚫 ${app}</span>
+      <span class="remove-app" onclick="removeApp('${app}', 'blocked')" title="Remove ${app}">×</span>
     </div>
   `).join('');
 }
 
 window.removeApp = async (app, type) => {
-  if (type === 'allowed') {
-    userSelectedApps = userSelectedApps.filter(a => a !== app);
-    renderAppList();
-    localStorage.setItem('selectedApps', JSON.stringify(userSelectedApps));
-  } else {
-    if (window.electronAPI && window.electronAPI.removeFromBlockList) {
-      await window.electronAPI.removeFromBlockList(app);
-      await loadBlockedApps();
+  const confirmMessage = `Are you sure you want to remove "${app}" from the ${type === 'allowed' ? 'allowed' : 'blocked'} list?`;
+  
+  if (confirm(confirmMessage)) {
+    if (type === 'allowed') {
+      userSelectedApps = userSelectedApps.filter(a => a !== app);
+      renderAppList();
+      localStorage.setItem('selectedApps', JSON.stringify(userSelectedApps));
+    } else {
+      if (window.electronAPI && window.electronAPI.removeFromBlockList) {
+        await window.electronAPI.removeFromBlockList(app);
+        await loadBlockedApps();
+      }
     }
   }
 };
@@ -223,14 +278,28 @@ async function startSession() {
   const duration = parseInt(document.getElementById('duration-input').value);
   
   if (userSelectedApps.length === 0) {
-    alert('Please add at least one allowed application');
+    alert('⚠️ Please add at least one allowed application before starting a focus session.');
     return;
   }
 
   if (duration < 1 || duration > 240) {
-    alert('Please enter a duration between 1 and 240 minutes');
+    alert('⚠️ Please enter a duration between 1 and 240 minutes.');
     return;
   }
+
+  if (blockedApps.length === 0) {
+    const shouldContinue = confirm('You haven\'t added any blocked applications. The session will only restrict you to the allowed apps. Continue anyway?');
+    if (!shouldContinue) return;
+  }
+
+  // Confirm session start
+  const confirmMessage = `Start focus session?\n\n` +
+    `Duration: ${duration} minutes\n` +
+    `Allowed apps: ${userSelectedApps.join(', ')}\n` +
+    `Blocked apps: ${blockedApps.length}\n\n` +
+    `Your allowed apps will be launched automatically and you'll be restricted to only those apps during the session.`;
+  
+  if (!confirm(confirmMessage)) return;
 
   try {
     const settings = {
@@ -239,6 +308,12 @@ async function startSession() {
     };
     
     if (window.electronAPI && window.electronAPI.startSession) {
+      // Show loading state
+      const startBtn = document.getElementById('start-btn');
+      const originalText = startBtn.textContent;
+      startBtn.textContent = '🚀 Starting Session...';
+      startBtn.disabled = true;
+      
       currentSession = await window.electronAPI.startSession(settings);
       
       // Update UI
@@ -247,18 +322,35 @@ async function startSession() {
       document.getElementById('duration-input').disabled = true;
       document.getElementById('add-app-btn').disabled = true;
       
-      alert(`Focus session started for ${duration} minutes! Blocking ${blockedApps.length} apps.`);
+      // Show success message
+      alert(`🎯 Focus session started!\n\nYour allowed apps are being launched. You can now use your desktop normally, but only the selected apps will work.\n\nSession will end automatically in ${duration} minutes.`);
+      
+      // Minimize the main window to let user focus on their apps
+      if (window.electronAPI.minimizeWindow) {
+        window.electronAPI.minimizeWindow();
+      }
+      
     } else {
-      alert('API not available. Please restart the application.');
+      alert('❌ API not available. Please restart the application.');
+      // Reset button state
+      document.getElementById('start-btn').textContent = originalText;
+      document.getElementById('start-btn').disabled = false;
     }
     
   } catch (err) {
     console.error('Failed to start session:', err);
-    alert('Failed to start session. Please try again.');
+    alert('❌ Failed to start focus session. Please try again.');
+    
+    // Reset button state
+    document.getElementById('start-btn').textContent = 'Start Focus Session';
+    document.getElementById('start-btn').disabled = false;
   }
 }
 
 async function stopSession() {
+  const shouldStop = confirm('Are you sure you want to end the focus session early?');
+  if (!shouldStop) return;
+  
   try {
     if (window.electronAPI && window.electronAPI.stopSession) {
       await window.electronAPI.stopSession();
@@ -271,10 +363,45 @@ async function stopSession() {
       
       currentSession = null;
       
-      alert('Focus session stopped!');
     } else {
-      alert('API not available. Please restart the application.');
+      alert('❌ API not available. Please restart the application.');
     }
+    
+  } catch (err) {
+    console.error('Failed to stop session:', err);
+    alert('❌ Failed to stop focus session. Please try again.');
+  }
+}
+
+// Handle window visibility changes and session state
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && currentSession) {
+    // Main window became visible again, session likely ended
+    document.getElementById('start-btn').style.display = 'block';
+    document.getElementById('stop-btn').style.display = 'none';
+    document.getElementById('duration-input').disabled = false;
+    document.getElementById('add-app-btn').disabled = false;
+    currentSession = null;
+  }
+});
+
+// Add keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  // Ctrl+Enter to start session
+  if (e.ctrlKey && e.key === 'Enter') {
+    if (document.getElementById('start-btn').style.display !== 'none') {
+      startSession();
+    }
+  }
+  
+  // Escape to close modals
+  if (e.key === 'Escape') {
+    const modal = document.querySelector('.modal');
+    if (modal) {
+      modal.remove();
+    }
+  }
+});
     
   } catch (err) {
     console.error('Failed to stop session:', err);
